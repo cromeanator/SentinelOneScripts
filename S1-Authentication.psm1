@@ -1,75 +1,67 @@
-
 function Invoke-S1Auth {
+    <#
+    .SYNOPSIS
+    Securely authenticates to the SentinelOne Management Console API.
+
+    .DESCRIPTION
+    Prompts the user for a SentinelOne Management Console URL and API Token. 
+    Authenticates securely using a secure string in memory only. 
+    If authentication fails, the user is prompted to re-enter credentials.
+    The token is never stored locally on disk, ensuring maximum security.
+
+    .PARAMETER ApiUrl
+    The base URL of the SentinelOne Management Console, e.g. "https://yourtenant.sentinelone.net".
+
+    .OUTPUTS
+    Hashtable containing the API token, base URL, and headers to use in future API requests.
+
+    .EXAMPLE
+    $auth = Invoke-S1Auth
+    Invoke-RestMethod -Uri "$($auth.ApiUrl)/web/api/v2.1/sites" -Headers $auth.Headers
+
+    .NOTES
+    Author: Josh (CrimzonHost)
+    Updated: May 2025
+    Version: 2.0 - Secure memory-only authentication with retry support.
+    #>
+
     param (
-        # Name under which the secret key will be stored in the Windows Credential Manager
-        [string]$CredentialName = "S1_API_Secret"
+        [string]$ApiUrl
     )
 
-    # ------------------------------
-    # Ensure the CredentialManager module is installed
-    # This module allows secure storage and retrieval of credentials
-    # ------------------------------
-    if (-not (Get-Module -ListAvailable -Name CredentialManager)) {
-        Write-Host "CredentialManager module not found. Installing..." -ForegroundColor Yellow
-        try {
-            Install-Module -Name CredentialManager -Scope CurrentUser -Force -AllowClobber
-        } catch {
-            Write-Error "Failed to install CredentialManager module. $_"
-            return
+    do {
+        if (-not $ApiUrl) {
+            $ApiUrl = Read-Host "Enter your SentinelOne Management Console URL (e.g., https://company.sentinelone.net)"
         }
-    }
 
-    # Import the CredentialManager module
-    Import-Module CredentialManager
+        $SecureToken = Read-Host "Enter your SentinelOne API Token" -AsSecureString
+        $ApiToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+            [Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureToken)
+        )
 
-    # ------------------------------
-    # Prompt the user for the SentinelOne API URL
-    # This is the base URL, e.g., https://usea1-pax.sentinelone.net
-    # ------------------------------
-    $url = Read-Host "Enter the S1 API base URL (e.g., https://usea1-pax.sentinelone.net)"
+        Write-Host "`n[*] Attempting to authenticate with SentinelOne..." -ForegroundColor Cyan
 
-    # ------------------------------
-    # Attempt to retrieve the stored secret key from Windows Credential Manager
-    # If not present, prompt the user and store it securely
-    # ------------------------------
-    $storedSecret = Get-StoredCredential -Target $CredentialName -ErrorAction SilentlyContinue
+        try {
+            $headers = @{ Authorization = "ApiToken $ApiToken" }
+            $response = Invoke-RestMethod -Uri "$ApiUrl/web/api/v2.1/users" -Headers $headers -Method Get -ErrorAction Stop
 
-    if (-not $storedSecret) {
-        # Prompt user to enter the API secret key securely
-        $secureSecret = Read-Host "Enter your S1 API secret key" -AsSecureString
+            Write-Host "[+] Authentication successful. Logged in as: $($response.data.username)" -ForegroundColor Green
 
-        # Save it securely in Credential Manager
-        New-StoredCredential -Target $CredentialName -UserName "S1User" -Password $secureSecret -Persist LocalMachine
-    } else {
-        $secureSecret = $storedSecret.Password
-    }
+            return @{
+                ApiToken = $ApiToken
+                ApiUrl   = $ApiUrl
+                Headers  = $headers
+            }
+        }
+        catch {
+            if ($_.Exception.Response -and $_.Exception.Response.StatusCode.Value__ -eq 401) {
+                Write-Warning "[!] Authentication failed: Invalid API token or URL. Please try again."
+                $ApiUrl = $null # Let user re-enter the URL in case it's incorrect too
+            } else {
+                Write-Error "Unexpected error: $($_.Exception.Message)"
+                return $null
+            }
+        }
 
-    # ------------------------------
-    # Convert the secure string to plain text for use in the HTTP header
-    # ------------------------------
-    $plainSecret = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-        [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureSecret)
-    )
-
-    # ------------------------------
-    # Prepare the Authorization header using the S1 API token format
-    # ------------------------------
-    $headers = @{
-        "Authorization" = "ApiToken $plainSecret"
-    }
-
-    # ------------------------------
-    # Use the /system/info endpoint to test authentication
-    # This endpoint provides info about the API environment and confirms auth
-    # ------------------------------
-    try {
-        $testEndpoint = "$url/web/api/v2.1/system/info"
-        $response = Invoke-RestMethod -Uri $testEndpoint -Headers $headers -Method Get
-
-        Write-Host "Authentication successful. System Info:" -ForegroundColor Green
-        $response | ConvertTo-Json -Depth 3
-    } catch {
-        # Print any error from the API call
-        Write-Error "Authentication failed or URL is incorrect: $_"
-    }
+    } while ($true)
 }
