@@ -24,9 +24,9 @@ function Invoke-S1Auth {
 
     # ------------------------------
     # Prompt the user for the SentinelOne API URL
-    # This is the base URL, e.g., https://usea1-pax8-03.sentinelone.net
+    # This is the base URL, e.g., https://usea1-pax.sentinelone.net
     # ------------------------------
-    $url = Read-Host "Enter the S1 API base URL (e.g., https://usea1-pax8-03.sentinelone.net)"
+    $url = Read-Host "Enter the S1 API base URL (e.g., https://usea1-pax.sentinelone.net)"
 
     # ------------------------------
     # Attempt to retrieve the stored secret key from Windows Credential Manager
