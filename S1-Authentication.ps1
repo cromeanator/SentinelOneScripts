@@ -1,3 +1,4 @@
+
 function Invoke-S1Auth {
     param (
         # Name under which the secret key will be stored in the Windows Credential Manager
