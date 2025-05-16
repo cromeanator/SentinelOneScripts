@@ -1,15 +1,15 @@
 <#
 .SYNOPSIS
-    Authenticates to the SentinelOne API using a stored or prompted API token.
+    Authenticates to the SentinelOne API by prompting for the API token.
 
 .DESCRIPTION
-    This function authenticates against the SentinelOne API using either a saved SecureString API token
-    or prompts the user securely if none is saved. If authentication fails due to invalid credentials,
-    it prompts the user again and retries. Token type is verified to avoid conversion errors.
+    This function authenticates against the SentinelOne API by securely prompting the user for the API token.
+    If authentication fails due to invalid credentials, it prompts the user again and retries. The token is 
+    never stored on disk.
 
 .NOTES
     Author: Josh Lytle
-    Modified: 2025-05-15
+    Modified: 2025-05-16
     GitHub: https://github.com/cromeanator
 
 .EXAMPLE
@@ -22,26 +22,13 @@ function Invoke-S1Auth {
 
     Write-Host "`n[*] Attempting to authenticate with SentinelOne..." -ForegroundColor Cyan
 
-    # Load stored token if available
-    $TokenPath = "$PSScriptRoot\s1token.xml"
-    $SecureStringToken = $null
     $ApiToken = $null
 
-    if (Test-Path $TokenPath) {
-        try {
-            $SecureStringToken = Import-Clixml -Path $TokenPath
-        } catch {
-            Write-Warning "[!] Failed to import token. It may be corrupted or inaccessible."
-        }
-    }
-
-    # Prompt user if no token found or if failed to load
+    # Prompt user for token every time
     while (-not $ApiToken) {
-        if (-not $SecureStringToken) {
-            $SecureStringToken = Read-Host "Enter SentinelOne API token" -AsSecureString
-        }
+        $SecureStringToken = Read-Host "Enter SentinelOne API token" -AsSecureString
 
-        # Safely convert SecureString to plain string, or handle string directly
+        # Safely convert SecureString to plain string
         try {
             if ($SecureStringToken -is [System.Security.SecureString]) {
                 $ApiToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
@@ -54,7 +41,6 @@ function Invoke-S1Auth {
             }
         } catch {
             Write-Warning "[!] Error converting token: $_"
-            $SecureStringToken = $null
             continue
         }
 
@@ -74,7 +60,6 @@ function Invoke-S1Auth {
         } catch {
             if ($_.ErrorDetails.Message -match "Authentication Failed" -or $_.Exception.Message -match "401") {
                 Write-Warning "[!] Authentication failed: Invalid API token or URL."
-                $SecureStringToken = $null
                 $ApiToken = $null
                 continue
             } else {
