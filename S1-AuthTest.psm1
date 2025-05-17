@@ -8,9 +8,8 @@
     never stored on disk.
 
 .NOTES
-    Author: Josh Lytle
     Modified: 2025-05-16
-    GitHub: https://github.com/cromeanator
+    CrimzonHost LLC (Crimzonhost.com) | Josh Lytle (https://github.com/cromeanator)
 
 .EXAMPLE
     Invoke-S1Auth

@@ -3,7 +3,7 @@
     Patch-LocalUpgradeDowngradeAttack.ps1
 
 .PUBLISHER
-    CrimzonHost | Josh Lytle (https://github.com/cromeanator)
+    CrimzonHost LLC (Crimzonhost.com) | Josh Lytle (https://github.com/cromeanator)
 
 .CREATED
     May 15, 2025
